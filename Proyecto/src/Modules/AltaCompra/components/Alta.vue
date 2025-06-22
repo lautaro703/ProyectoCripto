@@ -7,16 +7,19 @@
      
       </div>
   
-      <div class="form-group">
+     <div class="form-group">
         <label for="ClienteId">Cliente</label>
-        <input type="number" v-model="datosformulario.ClienteId" required placeholder="ID de Cliente"/>
-       </div>
+         <input type="number" v-model="datosformulario.clienteId" required placeholder="ID de Cliente" @blur="validarCliente" />
+         <p v-if="clienteExiste !== null" :style="{color: clienteExiste ? 'green' : 'red'}" class="menscliente">
+         {{ mensajeCliente }}
+     </p>
+   </div>
       
       <div class="form-group">
         <label for="crypto">Criptomoneda</label>
         <select v-model="datosformulario.cryptoCode" id="crypto">
          <option disabled value="">Elegí una criptomoneda</option>
-         <option v-for="crypto in criptosDisponibles" :key="crypto" :value="crypto">{{ crypto.toUpperCase() }}</option>
+         <option v-for="(nombre,codigo) in mapaCriptos" :key="codigo" :value="codigo">{{ nombre }}</option>
         </select>
       </div>
 
@@ -41,8 +44,7 @@
 
       <div class="form-group">
         <label for="amount">Monto (ARS)</label>
-        <input type="text" :value="datosformulario.monto.toLocaleString('es-AR')" readonly placeholder="Precio en pesos"/>
-        <input type="hidden" v-model="datosformulario.monto" />
+        <input type="text" v-model="montoFormateado" readonly />
       </div>
       
 
@@ -50,9 +52,8 @@
        <label for="datetime">Fecha y hora: {{ fechaHoraActual }}</label>
       </div>
 
-     
-
       <button @click="registro"> Confirmar Compra</button>
+
       <p v-if="loading" class="loading-mensaje">Cargando...</p>
       <div v-if="mensaje" class="mensaje-exitoso">{{ mensaje }}</div>
       <div v-if="error" class="mensaje-error">{{error}}</div>
@@ -63,90 +64,142 @@
 </template>
 
 <script setup>
-import axios from 'axios'
-import { ref, onMounted, onBeforeUnmount } from 'vue'
-
-const mensaje = ref('')
-const error = ref('')
-const loading = ref(false)
+  import axios from 'axios'
+  import { ref,watch, onMounted,computed, onBeforeUnmount } from 'vue';
 
 
-const datosformulario = ref({
-  cryptoCode: '',
-  accion: 'purchase',
-  id: 1,
-  cantidad: 0.00000001,
-  monto: 0,
-  fechayhora: ''
-})
+  const clienteExiste = ref(null) // true, false o null (sin validar)
+  const mensajeCliente = ref('')
+  const mensaje = ref('')
+  const error = ref('')
+  const loading = ref(false)
 
-const criptosDisponibles = ['bitcoin', 'ethereum', 'usdc', 'bnb']
-
-// Obtener el precio actual de la cripto seleccionada
-const preciosCryptos = async () => {
-  try {
-    const respuesta = await axios.get(`https://criptoya.com/api/bybit/BTC/ARS/0.1`)
-    return respuesta.data.totalAsk // corregido el nombre correcto del campo
-  } catch (err) {
-    throw new Error('Error al obtener el precio de la criptomoneda')
+  async function validarCliente() {
+    if (!datosformulario.value.clienteId) {
+      clienteExiste.value = null
+      mensajeCliente.value = ''
+      return
+    }
+    try {
+      await axios.get(`https://localhost:7171/api/Cliente/validar/${datosformulario.value.clienteId}`)
+      
+      clienteExiste.value = true
+      mensajeCliente.value = 'Cliente existe.'
+    } catch (error) {
+      clienteExiste.value = false
+      mensajeCliente.value = 'Cliente no encontrado.'
+    }
   }
+
+  const mapaCriptos = {
+    BTC: 'bitcoin',
+    ETH: 'ethereum',
+    USDC: 'usdc',
+    BNB: 'bnb'
+  }
+
+  const datosformulario = ref({
+    cryptoCode: '',
+    accion: 'purchase',
+    clienteId: null,
+    cantidad: 0.00000000,
+    monto:  1.00000001, 
+    fechaHoraActual: ''
+  })
+  const montoFormateado = computed(() =>
+    datosformulario.value.monto.toLocaleString('es-AR', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 8
+    })
+  )
+
+/*const preciosCryptos = async () => {
+  const codigoCripto = datosformulario.value.cryptoCode // ya es BTC, ETH, etc.
+  const cantidad = datosformulario.value.cantidad
+
+  if (!codigoCripto || cantidad <= 0) return 0
+
+  const response = await axios.get('https://localhost:7171/api/Transaccion/precio', {
+    params: {
+      codigo: codigoCripto,
+      cantidad: cantidad
+    }
+  })
+
+  return response.data
 }
 
-// Calcular el monto automáticamente
-const calcularMonto = async () => {
-  if (!datosformulario.value.cryptoCode || !datosformulario.value.cantidad) {
+  const calcularMonto = async () => {
+    if (!datosformulario.value.cryptoCode || !datosformulario.value.cantidad) {
     datosformulario.value.monto = 0
     return
   }
 
   try {
-    const precio = await preciosCryptos()
-    const montoTotal = datosformulario.value.cantidad * precio
-    datosformulario.value.monto = parseFloat(montoTotal.toFixed(2))
+    const montoTotal = await preciosCryptos()
+    datosformulario.value.monto = parseFloat(montoTotal.toFixed(8))
+    console.log('monto calculado' , montoTotal);
   } catch (err) {
     error.value = 'No se pudo calcular el monto'
   }
+  
 }
+*/
+  const registro = async () => {
+    mensaje.value = ''
+    error.value = ''
 
+    if (!datosformulario.value.clienteId) {
+    error.value = 'Ingrese un ID de cliente'
+    return
+  }
 
-const registro = async () => {
-  mensaje.value = ''
-  error.value = ''
+  if (clienteExiste.value === false) {
+    error.value = 'El cliente ingresado no existe.'
+    return
+  }
   if (!datosformulario.value.cryptoCode || !datosformulario.value.cantidad ) {
     error.value = 'Complete los campos obligatorios'
     return
   }
-
   if (datosformulario.value.cantidad <= 0) {
     error.value = 'La cantidad debe ser mayor a 0'
     return
   }
-  
+
+  if (datosformulario.value.monto <= 0) {
+    error.value = 'El monto no puede ser cero'
+    return
+  }
+
   try {
     loading.value = true
-    await calcularMonto()
-
-   const compra = {
-    cryptoCode: datosformulario.value.cryptoCode,
-    accion: datosformulario.value.accion,
-    ClienteId: datosformulario.value.id,
-    cantidad: parseFloat(datosformulario.value.cantidad),
-    monto: parseFloat(datosformulario.value.monto),
-    fechaHora: new Date().toISOString()
-  }
+   
+     const compra = {
+      cryptoCode: datosformulario.value.cryptoCode,
+      accion: datosformulario.value.accion,
+      clienteId: datosformulario.value.clienteId,
+      cantidad: parseFloat(datosformulario.value.cantidad),
+      monto:1.0000001,
+      fechaHora: new Date().toISOString()
+     }
      console.log("Enviando al backend:", JSON.stringify(compra, null, 2))
 
-    await axios.post('https://localhost:7171/api/Transaccion', compra)
+    await axios.post('http://localhost:5265/api/Transaccion', compra)
 
     mensaje.value = 'Compra registrada con éxito'
 
     datosformulario.value = {
       cryptoCode: '',
-      accion: 'purchase',
-      cantidad: 0.00000001,
-      monto: 0,
-      fechayhora: ''
+      accion: '',
+      clienteId: '',
+      cantidad: 0.00000000,
+      monto: 1.00000001,
+      fechaHora: ''
     }
+
+    clienteExiste.value = null
+    mensajeCliente.value = ''
   } catch (err) {
     console.error(err)
     error.value = 'Error al registrar la compra'
@@ -155,33 +208,38 @@ const registro = async () => {
   }
 }
 
-const fechaHoraActual = ref('')
+  const fechaHoraActual = ref('')
 
-function formatearFechaHora(date) {
-  const yyyy = date.getFullYear()
-  const mm = String(date.getMonth() + 1).padStart(2, '0')
-  const dd = String(date.getDate()).padStart(2, '0')
-  const hh = String(date.getHours()).padStart(2, '0')
-  const min = String(date.getMinutes()).padStart(2, '0')
-  return `${yyyy}-${mm}-${dd} ${hh}:${min}`
-}
+  function formatearFechaHora(date) {
+    const yyyy = date.getFullYear()
+    const mm = String(date.getMonth() + 1).padStart(2, '0')
+    const dd = String(date.getDate()).padStart(2, '0')
+    const hh = String(date.getHours()).padStart(2, '0')
+    const min = String(date.getMinutes()).padStart(2, '0')
+   return `${yyyy}-${mm}-${dd} ${hh}:${min}`
+ }
 
-function actualizarFechaHora() {
-  fechaHoraActual.value = formatearFechaHora(new Date())
-}
+  function actualizarFechaHora() {
+    fechaHoraActual.value = formatearFechaHora(new Date())
+  }
 
-let intervalo
+ let intervalo
 
-onMounted(() => {
-  actualizarFechaHora()
-  intervalo = setInterval(actualizarFechaHora, 60000)
-})
+  onMounted(() => {
+    actualizarFechaHora()
+    intervalo = setInterval(actualizarFechaHora, 60000)
+  })
 
-onBeforeUnmount(() => {
-  clearInterval(intervalo)
-})
+  onBeforeUnmount(() => {
+    clearInterval(intervalo)
+  })
 
-
+  /*watch(
+    () => [datosformulario.value.cryptoCode, datosformulario.value.cantidad],
+    async () => {
+      await calcularMonto()
+    }
+  )*/
 </script>
 
 <style scoped>
