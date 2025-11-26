@@ -1,205 +1,209 @@
 <template>
-
- <div class="purchase-container">
+  <div class="purchase-container">
     <div class="card">
       <div class="card-header">
         <h2>Comprar Criptomoneda</h2>
-     
       </div>
-  
-     <div class="form-group">
-        <label for="ClienteId">Cliente</label>
-         <input type="number" v-model="datosformulario.clienteId" required placeholder="ID de Cliente" @blur="validarCliente" />
-         <p v-if="clienteExiste !== null" :style="{color: clienteExiste ? 'green' : 'red'}" class="menscliente">
-         {{ mensajeCliente }}
-     </p>
-   </div>
-      
+
       <div class="form-group">
-        <label for="crypto">Criptomoneda</label>
-        <select v-model="datosformulario.cryptoCode" id="crypto">
-         <option disabled value="">Elegí una criptomoneda</option>
-         <option v-for="(nombre,codigo) in mapaCriptos" :key="codigo" :value="codigo">{{ nombre }}</option>
+        <label for="ClienteId">Cliente</label>
+        <select v-model="datosformulario.clienteId" id="ClienteId">
+          <option disabled value="">Seleccione un cliente</option>
+          <option v-for="cliente in clientes" :key="cliente.id" :value="cliente.id">
+            {{ cliente.nombre }}
+          </option>
         </select>
       </div>
 
       <div class="form-group">
-         <label for="cryptoCode">Crypto code:</label>
-         <input type="text" v-model="datosformulario.cryptoCode" placeholder="Ingrese el código de la cripto" required />
+        <label for="exchange">Banco</label>
+        <select v-model="datosformulario.exchange" id="exchange">
+          <option disabled value="">Elegí un banco</option>
+          <option v-for="(label, code) in mapaexchange" :key="code" :value="code">{{ label }}</option>
+        </select>
       </div>
 
       <div class="form-group">
-       <label for="accion">Acción:</label>
+        <label for="cryptoCode">Crypto</label>
+        <select v-model="datosformulario.cryptoCode" id="cryptoCode">
+          <option disabled value="">Elegí una criptomoneda</option>
+          <option v-for="(label, code) in mapaCriptos" :key="code" :value="label">{{ code }}</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="accion">Acción:</label>
         <select v-model="datosformulario.accion" id="accion" required>
-         <option disabled value="">¿Qué acción va a realizar?</option>
-         <option value="purchase">Compra</option>
-         <option value="sale">Venta</option>
+          <option disabled value="">¿Qué acción va a realizar?</option>
+          <option value="purchase">Compra</option>
+          <option value="sale">Venta</option>
         </select>
       </div>
 
       <div class="form-group">
         <label for="amount">Cantidad</label>
-       <input type="number" :value="datosformulario.cantidad.toFixed(8)" @input="e => datosformulario.cantidad = parseFloat(e.target.value)" step="0.00000001" min="0.00000001" placeholder="Ej: 0.00000001"/>
+        <input
+          id="amount"
+          type="number"
+          v-model.number="datosformulario.cantidad"
+          min="0.0000000000000000001"
+          placeholder="0.00000000"
+        />
       </div>
 
       <div class="form-group">
-        <label for="amount">Monto (ARS)</label>
-        <input type="text" v-model="montoFormateado" readonly />
+        <label for="monto">Monto (ARS)</label>
+        <!-- mostramos el monto calculado (solo lectura) -->
+        <input id="monto" type="text" :value="montoFormateado" readonly />
       </div>
-      
 
       <div class="form-group">
-       <label for="datetime">Fecha y hora: {{ fechaHoraActual }}</label>
+        <label for="datetime">Fecha y hora: {{ fechaHoraActual }}</label>
       </div>
-
-      <button @click="registro"> Confirmar Compra</button>
 
       <p v-if="loading" class="loading-mensaje">Cargando...</p>
       <div v-if="mensaje" class="mensaje-exitoso">{{ mensaje }}</div>
-      <div v-if="error" class="mensaje-error">{{error}}</div>
+      <div v-if="error" class="mensaje-error">{{ error }}</div>
+
+      <button @click="registro" :disabled="loading">Confirmar Compra</button>
       
-     
-   </div>
- </div>
+    </div>
+  </div>
 </template>
 
 <script setup>
-  import axios from 'axios'
-  import { ref,watch, onMounted,computed, onBeforeUnmount } from 'vue';
+import axios from 'axios'
+import { ref, watch, onMounted, onBeforeUnmount, computed } from 'vue'
 
+// --- Estado ---
+const clientes = ref([])
+const mensaje = ref('')
+const error = ref('')
+const loading = ref(false)
 
-  const clienteExiste = ref(null) // true, false o null (sin validar)
-  const mensajeCliente = ref('')
-  const mensaje = ref('')
-  const error = ref('')
-  const loading = ref(false)
-
-  async function validarCliente() {
-    if (!datosformulario.value.clienteId) {
-      clienteExiste.value = null
-      mensajeCliente.value = ''
-      return
-    }
-    try {
-      await axios.get(`https://localhost:7171/api/Cliente/validar/${datosformulario.value.clienteId}`)
-      
-      clienteExiste.value = true
-      mensajeCliente.value = 'Cliente existe.'
-    } catch (error) {
-      clienteExiste.value = false
-      mensajeCliente.value = 'Cliente no encontrado.'
-    }
-  }
-
-  const mapaCriptos = {
-    BTC: 'bitcoin',
-    ETH: 'ethereum',
-    USDC: 'usdc',
-    BNB: 'bnb'
-  }
-
-  const datosformulario = ref({
-    cryptoCode: '',
-    accion: 'purchase',
-    clienteId: null,
-    cantidad: 0.00000000,
-    monto:  1.00000001, 
-    fechaHoraActual: ''
-  })
-  const montoFormateado = computed(() =>
-    datosformulario.value.monto.toLocaleString('es-AR', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 8
-    })
-  )
-
-/*const preciosCryptos = async () => {
-  const codigoCripto = datosformulario.value.cryptoCode // ya es BTC, ETH, etc.
-  const cantidad = datosformulario.value.cantidad
-
-  if (!codigoCripto || cantidad <= 0) return 0
-
-  const response = await axios.get('https://localhost:7171/api/Transaccion/precio', {
-    params: {
-      codigo: codigoCripto,
-      cantidad: cantidad
-    }
-  })
-
-  return response.data
+// Mapa: key = valor que enviaremos a la API, value = label para mostrar
+const mapaexchange = {
+  binancep2p: 'Binance',
+  astropay: 'Astropay',
+  bitso: 'Bitso',
+  ripio: 'Ripio'
 }
 
-  const calcularMonto = async () => {
-    if (!datosformulario.value.cryptoCode || !datosformulario.value.cantidad) {
+const mapaCriptos = {
+  bitcoin: 'BTC',
+  ethereum: 'ETH',
+  usdc: 'USDC',
+  bnb: 'BNB'
+}
+
+const datosformulario = ref({
+  clienteId: '',
+  exchange: '',
+  cryptoCode: '',
+  accion: '',
+  cantidad: 0.00000000,
+  monto: 0.00000000,
+  fechaHora: ''
+})
+
+// Ref que guardará el precio final (opcional, usamos también datosformulario.monto)
+const PrecioFinal = ref(0)
+
+// Formateo del monto para mostrar
+const montoFormateado = computed(() => {
+  const monto = Number(datosformulario.value.monto || 0.000000000)
+  return monto.toLocaleString('es-AR', { minimumFractionDigits: 1, maximumFractionDigits: 10 })
+})
+
+// --- Llamada a la API para calcular el monto ---
+async function calcularmonto() {
+  const crypto = datosformulario.value.cryptoCode
+  const exchange = datosformulario.value.exchange
+  const cantidad = Number(datosformulario.value.cantidad)
+
+  if (!crypto || !exchange || !(cantidad > 0)) {
+    // si falta algo, ponemos 0
+    PrecioFinal.value = 0
     datosformulario.value.monto = 0
     return
   }
 
   try {
-    const montoTotal = await preciosCryptos()
-    datosformulario.value.monto = parseFloat(montoTotal.toFixed(8))
-    console.log('monto calculado' , montoTotal);
+    const resp = await axios.get('https://localhost:7171/api/Transaccion/obtenerPrecioAsync', {
+      params: {
+        exchange,
+        cantidad,
+        cripto: crypto
+      }
+    })
+
+    const precio = parseFloat(resp.data)
+    if (Number.isFinite(precio)) {
+      PrecioFinal.value = precio
+      datosformulario.value.monto = precio
+    } else {
+      PrecioFinal.value = 0
+      datosformulario.value.monto = 0
+    }
   } catch (err) {
-    error.value = 'No se pudo calcular el monto'
+    console.error('Error al obtener el monto:', err)
   }
-  
 }
-*/
-  const registro = async () => {
-    mensaje.value = ''
-    error.value = ''
 
-    if (!datosformulario.value.clienteId) {
-    error.value = 'Ingrese un ID de cliente'
+// --- Registro (envío al backend) ---
+const registro = async () => {
+  mensaje.value = ''
+  error.value = ''
+
+  if (!datosformulario.value.clienteId) {
+    error.value = 'Seleccione un cliente'
     return
   }
-
-  if (clienteExiste.value === false) {
-    error.value = 'El cliente ingresado no existe.'
-    return
-  }
-  if (!datosformulario.value.cryptoCode || !datosformulario.value.cantidad ) {
+  if (!datosformulario.value.cryptoCode || !datosformulario.value.cantidad) {
     error.value = 'Complete los campos obligatorios'
     return
   }
-  if (datosformulario.value.cantidad <= 0) {
+  if (Number(datosformulario.value.cantidad) <= 0) {
     error.value = 'La cantidad debe ser mayor a 0'
     return
   }
-
-  if (datosformulario.value.monto <= 0) {
+  if (Number(datosformulario.value.monto) <= 0) {
     error.value = 'El monto no puede ser cero'
     return
   }
 
   try {
     loading.value = true
-   
-     const compra = {
+    const compra = {
       cryptoCode: datosformulario.value.cryptoCode,
       accion: datosformulario.value.accion,
       clienteId: datosformulario.value.clienteId,
-      cantidad: parseFloat(datosformulario.value.cantidad),
-      monto:1.0000001,
+      cantidad: Number(datosformulario.value.cantidad),
+      monto: Number(datosformulario.value.monto),
       fechaHora: new Date().toISOString()
-     }
-     console.log("Enviando al backend:", JSON.stringify(compra, null, 2))
+    }
 
+    console.log('Enviando al backend:', compra)
     await axios.post('http://localhost:5265/api/Transaccion', compra)
 
     mensaje.value = 'Compra registrada con éxito'
 
+    // reset parcial del formulario (dejamos cliente para pruebas si querés)
     datosformulario.value = {
+      clienteId: '',
+      exchange: '',
       cryptoCode: '',
       accion: '',
-      clienteId: '',
       cantidad: 0.00000000,
-      monto: 1.00000001,
+      monto: 0.00000000,
       fechaHora: ''
     }
 
-    clienteExiste.value = null
-    mensajeCliente.value = ''
+    PrecioFinal.value = 0
+
+    setTimeout(() => {
+      mensaje.value = ''
+    }, 5000)
   } catch (err) {
     console.error(err)
     error.value = 'Error al registrar la compra'
@@ -208,38 +212,42 @@
   }
 }
 
-  const fechaHoraActual = ref('')
+// --- Fecha y hora ---
+const fechaHoraActual = ref('')
+function formatearFechaHora(date) {
+  const yyyy = date.getFullYear()
+  const mm = String(date.getMonth() + 1).padStart(2, '0')
+  const dd = String(date.getDate()).padStart(2, '0')
+  const hh = String(date.getHours()).padStart(2, '0')
+  const min = String(date.getMinutes()).padStart(2, '0')
+  return `${yyyy}-${mm}-${dd} ${hh}:${min}`
+}
+function actualizarFechaHora() {
+  fechaHoraActual.value = formatearFechaHora(new Date())
+}
 
-  function formatearFechaHora(date) {
-    const yyyy = date.getFullYear()
-    const mm = String(date.getMonth() + 1).padStart(2, '0')
-    const dd = String(date.getDate()).padStart(2, '0')
-    const hh = String(date.getHours()).padStart(2, '0')
-    const min = String(date.getMinutes()).padStart(2, '0')
-   return `${yyyy}-${mm}-${dd} ${hh}:${min}`
- }
-
-  function actualizarFechaHora() {
-    fechaHoraActual.value = formatearFechaHora(new Date())
+let intervalo
+onMounted(async () => {
+  try {
+    const response = await axios.get('https://localhost:7171/api/Cliente/listar')
+    clientes.value = response.data
+  } catch (err) {
+    console.error('Error al obtener los clientes:', err)
   }
 
- let intervalo
+  actualizarFechaHora()
+  intervalo = setInterval(actualizarFechaHora, 60000)
+})
 
-  onMounted(() => {
-    actualizarFechaHora()
-    intervalo = setInterval(actualizarFechaHora, 60000)
-  })
+onBeforeUnmount(() => {
+  clearInterval(intervalo)
+})
 
-  onBeforeUnmount(() => {
-    clearInterval(intervalo)
-  })
 
-  /*watch(
-    () => [datosformulario.value.cryptoCode, datosformulario.value.cantidad],
-    async () => {
-      await calcularMonto()
-    }
-  )*/
+watch(
+  () => [datosformulario.value.cryptoCode, datosformulario.value.exchange, datosformulario.value.cantidad],
+  calcularmonto
+)
 </script>
 
 <style scoped>
@@ -262,7 +270,7 @@
         background-color: rgb(0, 106, 255);
         padding: 30px;
         border-radius: 20px;
-        height: 800px;
+        height: 730px;
     }
     h2 {
        color: rgb(0, 57, 138);
@@ -279,11 +287,7 @@
         height: 80%;
         width: 40%;
     }
-    /*.purchase-container:hover {
-        transition: 2s;
-        transform: translateX(-.10px);
-        background-color: rgb(1, 1, 17);
-    }*/
+ 
     label{
         font-size: 0.9rem;
         font-weight: 600;
@@ -292,17 +296,28 @@
         margin-bottom: 15px;
         margin-left: 10px;
     }
-        input,
+    input{
+      width: 96%;
+      padding: 10px;
+      border-radius: 10px;
+      border: 1px solid #cbd5e1;
+      font-size: 1rem;
+      background: white;
+      color: #0f172a;
+      transition: all 0.3s;
+      margin-bottom: 10px;
+
+    }
     select {
-        width: 100%;
-        padding: 10px;
-        border-radius: 10px;
-        border: 1px solid #cbd5e1;
-        font-size: 1rem;
-        background: white;
-        color: #0f172a;
-        transition: all 0.3s;
-        margin-bottom: 10px;
+      width: 100%;
+      padding: 10px;
+      border-radius: 10px;
+      border: 1px solid #cbd5e1;
+      font-size: 1rem;
+      background: white;
+      color: #0f172a;
+      transition: all 0.3s;
+      margin-bottom: 10px;
     }
     .input-cantidad{
        
@@ -321,14 +336,16 @@
         background-color: rgb(0, 106, 255);
         border: 2px solid #ffffff;
         text-align: center;
-        margin-left: 198px;
-        margin-top: 40px;
+        margin-left: 25%;
+        margin-top: 10px;
         color: #ffffff;
+        width: 50%;
     }
     button:hover {
         transform: translateY(-5px);
         transition: 1s;
         box-shadow: 0 4px 6px rgb(0, 3, 70);
+        height: auto;
     }
     .loading-mensaje{
       color: #ffffff;

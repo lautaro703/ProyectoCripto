@@ -2,11 +2,14 @@
   <div class="navbar">
     <h2>Bienvenido</h2>
     <ul>
+      <li><router-link to="/registro">Registro de Cliente</router-link></li>
+      <li><router-link to="/ClientesModificacion">Ver Clientes</router-link></li>
       <li><router-link to="/alta">Nueva Compra</router-link></li>
-      <li><router-link to="/historial">Historial de Movimientos</router-link></li>
+      <li><router-link to="/historial">Historial de Movimientos</router-link></li>  
     </ul>
   </div>
 </template>
+
 
 <style scoped>
 .navbar {
@@ -40,9 +43,7 @@ h2{
 }
 
 li:hover{
-  transition: 0.8s;
-  transform: translateY(-8px);
-  text-shadow: 1px 1px 2px rgba(162, 162, 162, 0.6);
+ 
+  font-weight: bold;
 }
-
 </style>

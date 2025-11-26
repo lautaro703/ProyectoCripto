@@ -18,39 +18,17 @@
     :key="transaccion.id"
     class="historial-card"
   >
-    <!-- Modo edición -->
-    <template v-if="transaccionEditando && transaccionEditando.id === transaccion.id">
-      <label>Cripto:</label>
-       <p><strong>Cripto:</strong> {{ transaccion.cryptoCode }}</p>
+  
+    <p><strong>ID:</strong> {{ transaccion.id }}</p>
+    <p><strong>Cripto:</strong> {{transaccion.cryptoCode}}</p>
+    <p><strong>Acción:</strong> {{ transaccion.accion }}</p>
+    <p><strong>Cantidad:</strong> {{ transaccion.cantidad.toFixed(10) }}</p>
+    <p><strong>Monto:</strong> {{ transaccion.monto }}</p>
+    <p><strong>Fecha y hora:</strong> {{ transaccion.fechaHora }}</p>
 
-      <label>Acción:</label>
-      <input v-model="transaccionEditando.accion" />
-
-      <label>Cantidad:</label>
-      <input type="number" v-model.number="transaccionEditando.cantidad" />
-
-      <label>Monto:</label>
-      <input type="number" v-model.number="transaccionEditando.monto" />
-
-      <label>Fecha y Hora:</label>
-      <p>Fecha y hora: {{ transaccion.fechaHora }}</p>
-
-      <button @click="guardarCambios">Guardar</button>
-      <button @click="cancelarEdicion">Cancelar</button>
-    </template>
-
-    <!-- Modo lectura -->
-    <template v-else>
-      <p><strong>ID:</strong> {{ transaccion.id }}</p>
-      <p><strong>Cripto:</strong> {{ transaccion.cryptoCode }}</p>
-      <p><strong>Acción:</strong> {{ transaccion.accion }}</p>
-      <p><strong>Cantidad:</strong> {{ transaccion.cantidad.toFixed(8) }}</p>
-      <p><strong>Monto:</strong> {{ transaccion.monto }}</p>
-      <p><strong>Fecha y hora:</strong> {{ transaccion.fechaHora }}</p>
-
-      <button @click="modificarTransaccion(transaccion)">Modificar</button>
-      <button @click="eliminarTransaccion(transaccion.id)">Eliminar</button>
-    </template>
+    <button @click="MODIFICAR(transaccion)">Modificar</button>
+    <button @click="eliminarTransaccion(transaccion.id)">Eliminar</button>
+   
   </div>
  </div>
 </template>
@@ -58,12 +36,16 @@
 <script setup>
   import { ref, onMounted } from 'vue'
   import axios from 'axios'
+  import { useRouter } from 'vue-router'
 
+  const router = useRouter()
   const clientes = ref([])
   const clienteSeleccionado = ref('')
   const transacciones = ref([])
-  const transaccionEditando = ref(null)
 
+  const MODIFICAR = (transaccion) => {
+    router.push({path:'/modificar', query: {id: transaccion.id}})
+  }
 
   async function eliminarTransaccion(id) {
      const Confirmado = confirm('¿Desea elimiar la transacción?')
@@ -94,28 +76,6 @@
       transacciones.value = res.data
     } catch (error) {
       console.error('Error al obtener transacciones:', error)
-    }
-  }
-
-  function modificarTransaccion(transaccion) {
-    transaccionEditando.value = { ...transaccion }
-  }
-
-  function cancelarEdicion() {
-    transaccionEditando.value = null
-  }
-
-  async function guardarCambios() {
-    try{
-      const id = transaccionEditando.value.id
-      await axios.put(`https://localhost:7171/api/Transaccion/${id}`, transaccionEditando.value)
-      alert('Transacción actualizada correctamente')
-      transaccionEditando.value = null
-      await cargarTransacciones()
-    }
-    catch (error) {
-      console.error('Error al guardar cambios:', error)
-      alert('Error al actualizar la transacción')
     }
   }
 
